@@ -86,6 +86,103 @@ a regional user gets a 404 rather than a redaction for out-of-region rows, that 
 log rejects `UPDATE` and `DELETE` at the database level, and that every denial is recorded.
 A second CI job fails the build if a tool imports `pg` or touches a session cookie directly.
 
+## Create a new tool
+
+This is the part that replaces Power Apps' authoring experience. The requester describes
+the tool in business terms; Devin does the six steps below; CI refuses anything that
+leaves the paved road. `apps/dsar-console` is the worked example — it was built this way
+after the platform existed, and `docs/RESULTS.md` records what it cost.
+
+### 0. Write the request, not the design
+
+A usable request states the entity, who may see it, who may change it, and what must be
+recorded. Everything else is the platform's problem:
+
+> A queue of GDPR data-subject requests against existing customers. Support can see the
+> queue but not close anything; data stewards and compliance admins can resolve a request
+> with a note. Region scoping and PII masking as everywhere else. 30-day SLA, flag the
+> breaches, and every read and resolution must be in the audit log.
+
+Note what is absent: no login, no roles table, no masking rules, no audit plumbing, no
+deployment. Asking for those is a sign the request is being over-specified.
+
+### 1. Data — one migration, one access module
+
+```
+db/migrations/00X_<entity>.sql      # the table
+packages/data/src/<entity>.ts       # queries + its FieldPolicy
+```
+
+The access module declares which columns are PII and applies the region scope; tools call
+it and never write SQL, so masking and row-level scope cannot be forgotten in a template.
+
+```ts
+const DSAR_FIELD_POLICY = { full_name: "pii", email: "pii" } as const;
+// every read returns applyFieldPolicy(row, DSAR_FIELD_POLICY, principal)
+```
+
+### 2. Permissions — a data change in one file
+
+Add the permission and give it to roles in `packages/platform/src/rbac.ts`:
+
+```ts
+type Permission = ... | "dsar:read" | "dsar:resolve";
+
+support:            [... "dsar:read"]                 // may watch the queue, not close it
+"data-steward":     [... "dsar:read", "dsar:resolve"]
+"kyc-reviewer":     [...]                             // omitted → refused, silently and by default
+```
+
+A role that is not listed is refused. New tools are deny-by-default without the tool
+containing any authorization logic.
+
+### 3. API — routes and nothing else
+
+```
+apps/<tool>/api/src/server.ts   # loadConfig + createService + buildApp + listen (~20 lines, copy it)
+apps/<tool>/api/src/app.ts      # routes only
+```
+
+Each route names the permission it needs and records what it did:
+
+```ts
+app.post("/api/requests/:id/resolution", requirePermission("dsar:resolve"), async (req, res, next) => {
+  const { resolution, note } = resolutionBody.parse(req.body);   // your domain rules
+  const row = await resolveRequest(db, req.principal!, id, resolution, note);
+  await req.audit({ action: "dsar.request.resolve", resourceType: "dsar_request", resourceId: id });
+  res.json(row);
+});
+```
+
+If you catch yourself writing `jwtVerify`, importing `pg`, or reading a cookie: stop. The
+`policy` CI job fails the build, and the thing you need belongs in `packages/platform` so
+every tool gets it.
+
+### 4. Web — composition, not components
+
+```
+apps/<tool>/web/app/layout.tsx providers.tsx page.tsx
+```
+
+Build screens from `AppShell`, `DataTable`, `FilterBar`, `Card`, `DetailList`, `Pill`,
+`Button` and the inputs. `IfPermitted` hides actions the user cannot take — remember that
+hiding is cosmetic and the API is what actually refuses. Needing a new primitive is fine;
+put it in `packages/ui` so tool #12 inherits it.
+
+### 5. Register and ship
+
+```hcl
+# infra/variables.tf
+<tool> = { api_port = 400X, web_port = 300X }
+```
+
+plus an OIDC client in `services/idp`, two `dev:` scripts in `package.json`, and a test
+file asserting who is refused — the 403s and the out-of-region 404, not just the happy
+path. Then `npm run lint && npm run typecheck && npm test`, and open a PR.
+
+Last and most important: give the tool a **named owner** in the catalogue. A tool without
+one is the failure mode this platform exists to prevent.
+
 ## Infrastructure
 
 `infra/` is Terraform, Docker-backed so it runs anywhere. A tool is a map entry:
