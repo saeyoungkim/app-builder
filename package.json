@@ -21,7 +21,7 @@
     "db:migrate": "node --experimental-strip-types db/migrate.ts",
     "db:seed": "node --experimental-strip-types db/seed/seed.ts",
     "db:reset": "npm run db:migrate && npm run db:seed",
-    "dev": "concurrently -n idp,cc-api,cc-web,kyc-api,kyc-web,dsar-api,dsar-web,cmp-api,cmp-web -c cyan,green,greenBright,magenta,magentaBright,yellow,yellowBright,blue,blueBright \"npm:dev:idp\" \"npm:dev:cc-api\" \"npm:dev:cc-web\" \"npm:dev:kyc-api\" \"npm:dev:kyc-web\" \"npm:dev:dsar-api\" \"npm:dev:dsar-web\" \"npm:dev:cmp-api\" \"npm:dev:cmp-web\"",
+    "dev": "concurrently -n idp,cc-api,cc-web,kyc-api,kyc-web,dsar-api,dsar-web,cmp-api,cmp-web,unl-api,unl-web -c cyan,green,greenBright,magenta,magentaBright,yellow,yellowBright,blue,blueBright,red,redBright \"npm:dev:idp\" \"npm:dev:cc-api\" \"npm:dev:cc-web\" \"npm:dev:kyc-api\" \"npm:dev:kyc-web\" \"npm:dev:dsar-api\" \"npm:dev:dsar-web\" \"npm:dev:cmp-api\" \"npm:dev:cmp-web\" \"npm:dev:unl-api\" \"npm:dev:unl-web\"",
     "dev:idp": "npm run dev -w @paved/idp",
     "dev:cc-api": "npm run dev -w @paved/customer-console-api",
     "dev:cc-web": "npm run dev -w @paved/customer-console-web",
@@ -30,7 +30,9 @@
     "dev:dsar-api": "npm run dev -w @paved/dsar-console-api",
     "dev:dsar-web": "npm run dev -w @paved/dsar-console-web",
     "dev:cmp-api": "npm run dev -w @paved/complaints-desk-api",
-    "dev:cmp-web": "npm run dev -w @paved/complaints-desk-web"
+    "dev:cmp-web": "npm run dev -w @paved/complaints-desk-web",
+    "dev:unl-api": "npm run dev -w @paved/account-unlock-api",
+    "dev:unl-web": "npm run dev -w @paved/account-unlock-web"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",

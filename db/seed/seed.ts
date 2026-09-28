@@ -29,7 +29,7 @@ const rand = rng(20260928);
 const pick = <T>(items: readonly T[]): T => items[Math.floor(rand() * items.length)] as T;
 
 await pool.query(
-  "truncate complaints, dsar_requests, kyc_documents, kyc_cases, customer_notes, customers restart identity cascade",
+  "truncate account_locks, complaints, dsar_requests, kyc_documents, kyc_cases, customer_notes, customers restart identity cascade",
 );
 await pool.query("alter sequence complaints_reference_seq restart with 80000");
 
@@ -193,13 +193,44 @@ for (const customer of customerIds) {
   );
 }
 
-const counts = await pool.query<{ customers: string; cases: string; dsars: string; complaints: string }>(
+const LOCK_REASONS = ["password", "one_time_code", "security_question"] as const;
+const LOCK_CHANNELS = ["web", "mobile", "phone"] as const;
+let lockIndex = 0;
+for (const customer of customerIds) {
+  if (rand() > 0.3) continue;
+  lockIndex += 1;
+  const unlocked = rand() < 0.3;
+  const lockedHoursAgo = 1 + Math.floor(rand() * 240);
+  const locked = new Date(Date.now() - lockedHoursAgo * 3_600_000);
+  await pool.query(
+    `insert into account_locks
+       (reference, customer_id, lock_reason, channel, failed_attempts, last_failed_at, locked_at,
+        status, unlocked_at, unlocked_by, unlock_note)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [
+      `LCK-${String(90_000 + lockIndex)}`,
+      customer.id,
+      pick(LOCK_REASONS),
+      pick(LOCK_CHANNELS),
+      5 + Math.floor(rand() * 6),
+      locked,
+      locked,
+      unlocked ? "unlocked" : "locked",
+      unlocked ? new Date(locked.getTime() + Math.floor(rand() * 12 + 1) * 3_600_000) : null,
+      unlocked ? "avery.admin@example-synthetic.test" : null,
+      unlocked ? "Identity re-verified on a recorded call; customer confirmed the failed attempts were theirs." : null,
+    ],
+  );
+}
+
+const counts = await pool.query<{ customers: string; cases: string; dsars: string; complaints: string; locks: string }>(
   `select (select count(*) from customers) as customers,
           (select count(*) from kyc_cases) as cases,
           (select count(*) from dsar_requests) as dsars,
-          (select count(*) from complaints) as complaints`,
+          (select count(*) from complaints) as complaints,
+          (select count(*) from account_locks) as locks`,
 );
 console.log(
-  `seeded ${counts.rows[0]?.customers} customers, ${counts.rows[0]?.cases} KYC cases, ${counts.rows[0]?.dsars} data subject requests and ${counts.rows[0]?.complaints} complaints (synthetic)`,
+  `seeded ${counts.rows[0]?.customers} customers, ${counts.rows[0]?.cases} KYC cases, ${counts.rows[0]?.dsars} data subject requests, ${counts.rows[0]?.complaints} complaints and ${counts.rows[0]?.locks} account locks (synthetic)`,
 );
 await pool.end();

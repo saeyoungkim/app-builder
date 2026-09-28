@@ -8,7 +8,7 @@ a complaint and another refused.
 
 Power Apps makes tool #1 cheap. The argument for owning the stack only works if tool #11
 is cheaper still, and that depends entirely on what a new tool inherits rather than
-rebuilds. So this repository is a shared platform plus four tools built on it, and the
+rebuilds. So this repository is a shared platform plus five tools built on it, and the
 interesting number is not the first one.
 
 Everything here is synthetic. No production data, no real customers, no money movement.
@@ -27,7 +27,7 @@ Everything here is synthetic. No production data, no real customers, no money mo
 | Container topology, environments | `infra/` | a map entry in `infra/variables.tf` |
 | Authorization + policy gate | `.github/workflows/ci.yml` | nothing |
 
-The four tools:
+The five tools:
 
 - **`apps/customer-console`** — tool #1. Search, list, detail, edit and note customer
   records, with PII masking and region scoping.
@@ -40,8 +40,11 @@ The four tools:
   clock: support logs a complaint, data stewards and compliance admins close it with an
   outcome. Built from the request in `docs/RESULTS.md` and recorded in
   `docs/demo-new-tool.mp4`.
+- **`apps/account-unlock`** — tool #5. A queue of customer accounts locked after failed
+  sign-in attempts: support can view a lock and the customer's basic profile, only
+  compliance admins can unlock, and only with a written justification.
 
-Tools #2, #3 and #4 are ~80, ~90 and ~110 lines of routes and contain no authentication,
+Tools #2, #3, #4 and #5 are ~80, ~90, ~110 and ~70 lines of routes and contain no authentication,
 no role logic, no masking, no audit plumbing and no infrastructure. See `docs/RESULTS.md`.
 
 ## Run it locally
@@ -65,6 +68,7 @@ npm run dev          # local IdP + every API + every front end
 | KYC review queue | http://localhost:3002 |
 | Data subject requests | http://localhost:3003 |
 | Complaints desk | http://localhost:3004 |
+| Account unlock | http://localhost:3005 |
 | Local OIDC provider | http://localhost:9000 |
 
 ### Test users
@@ -74,10 +78,10 @@ group→role mapping; it is not an identity service and must never run outside d
 
 | Sign in as | Groups | Sees |
 |---|---|---|
-| `sam.support@example-synthetic.test` | `internal-support`, `region-EMEA` | EMEA customers, DSARs and complaints, all PII masked, no edit, no KYC; can log a complaint but not close one, cannot resolve a DSAR |
-| `dana.steward@example-synthetic.test` | `data-stewards`, `region-global` | every region, PII in the clear, can edit, resolve DSARs and close complaints — but no KYC decisions |
-| `ken.reviewer@example-synthetic.test` | `kyc-reviewers`, `region-APAC` | APAC KYC cases only, can decide; no DSAR or complaint access |
-| `avery.admin@example-synthetic.test` | `compliance-admins`, `region-global` | everything, including the audit log |
+| `sam.support@example-synthetic.test` | `internal-support`, `region-EMEA` | EMEA customers, DSARs and complaints, all PII masked, no edit, no KYC; can log a complaint but not close one, cannot resolve a DSAR; can view locked accounts but not unlock one |
+| `dana.steward@example-synthetic.test` | `data-stewards`, `region-global` | every region, PII in the clear, can edit, resolve DSARs and close complaints — but no KYC decisions and no account-unlock access |
+| `ken.reviewer@example-synthetic.test` | `kyc-reviewers`, `region-APAC` | APAC KYC cases only, can decide; no DSAR, complaint or account-unlock access |
+| `avery.admin@example-synthetic.test` | `compliance-admins`, `region-global` | everything, including unlocking accounts and the audit log |
 
 Roles come from directory groups only. There is no user-role table to drift, and no
 in-app admin screen that can grant someone a permission the directory did not.
@@ -87,7 +91,7 @@ in-app admin screen that can grant someone a permission the directory did not.
 ```bash
 npm run lint
 npm run typecheck
-npm test          # 55 tests: authorization, region scope, PII masking, audit
+npm test          # 66 tests: authorization, region scope, PII masking, audit
 ```
 
 The tests are the point of the CI gate: they assert that a support user cannot write, that
@@ -204,6 +208,7 @@ tools = {
   kyc-queue        = { api_port = 4002, web_port = 3002 }
   dsar-console     = { api_port = 4003, web_port = 3003 }
   complaints-desk  = { api_port = 4004, web_port = 3004 }
+  account-unlock   = { api_port = 4005, web_port = 3005 }
 }
 ```
 

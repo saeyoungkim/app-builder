@@ -52,6 +52,14 @@ const configuration: Configuration = {
       response_types: ["code"],
       token_endpoint_auth_method: "client_secret_basic",
     },
+    {
+      client_id: "account-unlock",
+      client_secret: process.env.ACCOUNT_UNLOCK_CLIENT_SECRET ?? "dev-account-unlock-secret",
+      redirect_uris: [`${process.env.ACCOUNT_UNLOCK_API_URL ?? "http://localhost:4005"}/auth/callback`],
+      grant_types: ["authorization_code"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "client_secret_basic",
+    },
   ],
   scopes: ["openid", "profile", "email", "groups"],
   claims: {

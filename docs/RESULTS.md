@@ -126,6 +126,43 @@ The step the procedure demands and this prototype cannot satisfy is the last one
 owner. The complaints desk has none, for the same reason the other three do not — point 5
 below.
 
+## Tool #5, a privilege split on a single action
+
+> A simple queue of customer accounts locked due to failed authentication attempts.
+> Support agents can view locked accounts and inspect basic profile details, but only
+> compliance admins may unlock an account with a required justification note. Region
+> scoping and PII masking apply as everywhere else, and every view and unlock action must
+> be recorded in the audit log.
+
+| File | Lines | What it is |
+|---|---|---|
+| `db/migrations/006_account_locks.sql` | 19 | the new table, at most one active lock per customer |
+| `packages/data/src/account-locks.ts` | 125 | queries — region scope and field policy applied by calling shared helpers |
+| `apps/account-unlock/api/src/app.ts` | 69 | three routes, two Zod schemas, three `req.audit` calls |
+| `apps/account-unlock/api/src/server.ts` | 21 | `loadConfig` → `createService` → `listen`, copied |
+| `apps/account-unlock/web/app/page.tsx` | 104 | queue screen, composed from `packages/ui` |
+| `apps/account-unlock/web/app/locks/[id]/page.tsx` | 127 | profile + lock detail + unlock screen |
+| `packages/platform/src/rbac.ts` | +13 | two permission strings, assigned to two roles |
+| `services/idp/src/server.ts` | +8 | one OIDC client |
+| `infra/variables.tf` | +4 | one map entry |
+| `package.json` | +2 | two dev scripts |
+
+"Basic profile details" is a data-layer decision, not a template one: the access module
+selects name, email, phone, city, country, region and account status, and never the date
+of birth, national ID or address, so no screen can show them. Name, email and phone reuse
+the customer field policy, so support sees them masked. Data stewards and KYC reviewers
+were not named in the request and are refused the whole tool by omission.
+
+`tests/account-unlock.api.test.ts` (10 tests) asserts anonymous 401, KYC reviewer and
+data steward 403, EMEA-only rows for support with the list view audited, 404 for an APAC
+lock, masked `full_name`/`email`/`phone` for support with DOB and national ID absent and
+the detail view audited against the customer, PII in the clear for a compliance admin,
+403 (and an audited denial) on unlock as support, 403 on unlock as a data steward, 400 on
+a missing or whitespace justification, the audit row carrying the trimmed justification,
+and 409 on unlocking an already-unlocked account.
+
+Like the other four, account unlock has no named owner yet.
+
 ## Criterion by criterion
 
 | Criterion | Status | Evidence |
