@@ -11,12 +11,15 @@ export type Permission =
   | "kyc:case:decide"
   | "dsar:read"
   | "dsar:resolve"
+  | "complaint:read"
+  | "complaint:log"
+  | "complaint:close"
   | "audit:read";
 
 export type Role = "support" | "data-steward" | "kyc-reviewer" | "compliance-admin";
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  support: ["customer:read", "customer:note:write", "dsar:read"],
+  support: ["customer:read", "customer:note:write", "dsar:read", "complaint:read", "complaint:log"],
   "data-steward": [
     "customer:read",
     "customer:read_pii",
@@ -24,6 +27,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "customer:note:write",
     "dsar:read",
     "dsar:resolve",
+    "complaint:read",
+    "complaint:log",
+    "complaint:close",
   ],
   "kyc-reviewer": ["customer:read", "customer:read_pii", "kyc:case:read", "kyc:case:decide"],
   "compliance-admin": [
@@ -35,6 +41,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "kyc:case:decide",
     "dsar:read",
     "dsar:resolve",
+    "complaint:read",
+    "complaint:log",
+    "complaint:close",
     "audit:read",
   ],
 };

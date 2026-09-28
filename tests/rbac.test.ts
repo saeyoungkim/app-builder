@@ -24,6 +24,15 @@ describe("group-to-role mapping", () => {
     expect(can(p, "audit:read")).toBe(false);
   });
 
+  it("splits a new tool's permissions across roles without touching the tool", () => {
+    const support = principalFromClaims({ sub: "u1", groups: ["internal-support"] });
+    const steward = principalFromClaims({ sub: "u2", groups: ["data-stewards"] });
+    const reviewer = principalFromClaims({ sub: "u3", groups: ["kyc-reviewers"] });
+    expect([can(support, "complaint:log"), can(support, "complaint:close")]).toEqual([true, false]);
+    expect(can(steward, "complaint:close")).toBe(true);
+    expect(can(reviewer, "complaint:read")).toBe(false);
+  });
+
   it("only compliance-admin can read the audit log", () => {
     const admin = principalFromClaims({ sub: "u1", groups: ["compliance-admins"] });
     const steward = principalFromClaims({ sub: "u2", groups: ["data-stewards"] });

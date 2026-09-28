@@ -50,5 +50,9 @@ variable "tools" {
       api_port = 4003
       web_port = 3003
     }
+    complaints-desk = {
+      api_port = 4004
+      web_port = 3004
+    }
   }
 }

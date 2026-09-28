@@ -29,8 +29,9 @@ const rand = rng(20260928);
 const pick = <T>(items: readonly T[]): T => items[Math.floor(rand() * items.length)] as T;
 
 await pool.query(
-  "truncate dsar_requests, kyc_documents, kyc_cases, customer_notes, customers restart identity cascade",
+  "truncate complaints, dsar_requests, kyc_documents, kyc_cases, customer_notes, customers restart identity cascade",
 );
+await pool.query("alter sequence complaints_reference_seq restart with 80000");
 
 const CUSTOMER_COUNT = 120;
 const customerIds: { id: string; region: string }[] = [];
@@ -148,12 +149,57 @@ for (const customer of customerIds) {
   );
 }
 
-const counts = await pool.query<{ customers: string; cases: string; dsars: string }>(
+const COMPLAINT_CATEGORIES = ["billing", "service", "access", "fees", "other"] as const;
+const COMPLAINT_CHANNELS = ["phone", "email", "branch", "web"] as const;
+const COMPLAINT_SUMMARIES = [
+  "Charged a maintenance fee after the account was already closed.",
+  "Waited three weeks for a card replacement that never arrived.",
+  "Locked out of the app after a device change and no one called back.",
+  "Disputed an exchange rate applied to a scheduled transfer.",
+  "Statement export was missing two months of activity.",
+];
+for (const customer of customerIds) {
+  if (rand() > 0.28) continue;
+  const roll = rand();
+  const status =
+    roll < 0.38 ? "open" : roll < 0.58 ? "investigating" : roll < 0.8 ? "upheld" : roll < 0.93 ? "rejected" : "withdrawn";
+  const closed = status !== "open" && status !== "investigating";
+  const openedDaysAgo = Math.floor(rand() * 80);
+  const opened = new Date(Date.now() - openedDaysAgo * 86_400_000);
+  await pool.query(
+    `insert into complaints
+       (reference, customer_id, category, channel, summary, status, opened_at, due_at, closed_at, closed_by, logged_by, outcome_note)
+     values ('CMP-' || lpad((nextval('complaints_reference_seq'))::text, 5, '0'),
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [
+      customer.id,
+      pick(COMPLAINT_CATEGORIES),
+      pick(COMPLAINT_CHANNELS),
+      pick(COMPLAINT_SUMMARIES),
+      status,
+      opened,
+      new Date(opened.getTime() + 56 * 86_400_000),
+      closed ? new Date(opened.getTime() + Math.floor(rand() * 40) * 86_400_000) : null,
+      closed ? "dana.steward@example-synthetic.test" : null,
+      "sam.support@example-synthetic.test",
+      closed
+        ? status === "upheld"
+          ? "Fee refunded and the process that caused it corrected."
+          : status === "rejected"
+            ? "Charge applied correctly under the published tariff; explained to the customer."
+            : "Customer withdrew the complaint after the account was reinstated."
+        : null,
+    ],
+  );
+}
+
+const counts = await pool.query<{ customers: string; cases: string; dsars: string; complaints: string }>(
   `select (select count(*) from customers) as customers,
           (select count(*) from kyc_cases) as cases,
-          (select count(*) from dsar_requests) as dsars`,
+          (select count(*) from dsar_requests) as dsars,
+          (select count(*) from complaints) as complaints`,
 );
 console.log(
-  `seeded ${counts.rows[0]?.customers} customers, ${counts.rows[0]?.cases} KYC cases and ${counts.rows[0]?.dsars} data subject requests (synthetic)`,
+  `seeded ${counts.rows[0]?.customers} customers, ${counts.rows[0]?.cases} KYC cases, ${counts.rows[0]?.dsars} data subject requests and ${counts.rows[0]?.complaints} complaints (synthetic)`,
 );
 await pool.end();

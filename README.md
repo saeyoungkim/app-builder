@@ -2,9 +2,13 @@
 
 A prototype that answers one question: **what does the *next* internal tool cost?**
 
+`docs/demo-new-tool.mp4` is a recorded run of the procedure below: a fourth tool written
+from a business-terms request, the checks passing, and the tool live with one role logging
+a complaint and another refused.
+
 Power Apps makes tool #1 cheap. The argument for owning the stack only works if tool #11
 is cheaper still, and that depends entirely on what a new tool inherits rather than
-rebuilds. So this repository is a shared platform plus three tools built on it, and the
+rebuilds. So this repository is a shared platform plus four tools built on it, and the
 interesting number is not the first one.
 
 Everything here is synthetic. No production data, no real customers, no money movement.
@@ -18,12 +22,12 @@ Everything here is synthetic. No production data, no real customers, no money mo
 | Row-level region scope | `packages/platform` + `packages/data` | nothing |
 | Field-level PII masking | `packages/platform/src/field-policy.ts` | a field classification, once per entity |
 | Audit log (append-only) | `packages/platform/src/audit.ts` | one `req.audit({...})` per meaningful action |
-| Customer / KYC / DSAR data access | `packages/data` | a query call |
+| Customer / KYC / DSAR / complaint data access | `packages/data` | a query call |
 | Grids, filters, forms, detail panes, app shell | `packages/ui` | composition |
 | Container topology, environments | `infra/` | a map entry in `infra/variables.tf` |
 | Authorization + policy gate | `.github/workflows/ci.yml` | nothing |
 
-The three tools:
+The four tools:
 
 - **`apps/customer-console`** — tool #1. Search, list, detail, edit and note customer
   records, with PII masking and region scoping.
@@ -32,9 +36,13 @@ The three tools:
 - **`apps/dsar-console`** — tool #3. A data-subject-request queue: filter by status, type
   and SLA breach, open a request, resolve it with a note. Built after the fact to show
   what a new tool costs; `docs/ADDING-A-TOOL.md` is the procedure it followed.
+- **`apps/complaints-desk`** — tool #4. A complaints queue with an eight-week final-response
+  clock: support logs a complaint, data stewards and compliance admins close it with an
+  outcome. Built from the request in `docs/RESULTS.md` and recorded in
+  `docs/demo-new-tool.mp4`.
 
-Tools #2 and #3 are ~80 and ~90 lines of routes and contain no authentication, no role
-logic, no masking, no audit plumbing and no infrastructure. See `docs/RESULTS.md`.
+Tools #2, #3 and #4 are ~80, ~90 and ~110 lines of routes and contain no authentication,
+no role logic, no masking, no audit plumbing and no infrastructure. See `docs/RESULTS.md`.
 
 ## Run it locally
 
@@ -47,7 +55,7 @@ docker run -d --name paved-pg -e POSTGRES_PASSWORD=devpass -e POSTGRES_USER=devu
 cp .env.example .env
 npm install
 npm run build:packages
-npm run db:reset     # migrate + seed 120 synthetic customers, KYC cases and DSARs
+npm run db:reset     # migrate + seed 120 synthetic customers, KYC cases, DSARs and complaints
 npm run dev          # local IdP + every API + every front end
 ```
 
@@ -56,6 +64,7 @@ npm run dev          # local IdP + every API + every front end
 | Customer console | http://localhost:3001 |
 | KYC review queue | http://localhost:3002 |
 | Data subject requests | http://localhost:3003 |
+| Complaints desk | http://localhost:3004 |
 | Local OIDC provider | http://localhost:9000 |
 
 ### Test users
@@ -65,9 +74,9 @@ group→role mapping; it is not an identity service and must never run outside d
 
 | Sign in as | Groups | Sees |
 |---|---|---|
-| `sam.support@example-synthetic.test` | `internal-support`, `region-EMEA` | EMEA customers and DSARs, all PII masked, no edit, no KYC, cannot resolve a DSAR |
-| `dana.steward@example-synthetic.test` | `data-stewards`, `region-global` | every region, PII in the clear, can edit and resolve DSARs — but no KYC decisions |
-| `ken.reviewer@example-synthetic.test` | `kyc-reviewers`, `region-APAC` | APAC KYC cases only, can decide; no DSAR access |
+| `sam.support@example-synthetic.test` | `internal-support`, `region-EMEA` | EMEA customers, DSARs and complaints, all PII masked, no edit, no KYC; can log a complaint but not close one, cannot resolve a DSAR |
+| `dana.steward@example-synthetic.test` | `data-stewards`, `region-global` | every region, PII in the clear, can edit, resolve DSARs and close complaints — but no KYC decisions |
+| `ken.reviewer@example-synthetic.test` | `kyc-reviewers`, `region-APAC` | APAC KYC cases only, can decide; no DSAR or complaint access |
 | `avery.admin@example-synthetic.test` | `compliance-admins`, `region-global` | everything, including the audit log |
 
 Roles come from directory groups only. There is no user-role table to drift, and no
@@ -78,7 +87,7 @@ in-app admin screen that can grant someone a permission the directory did not.
 ```bash
 npm run lint
 npm run typecheck
-npm test          # 44 tests: authorization, region scope, PII masking, audit
+npm test          # 55 tests: authorization, region scope, PII masking, audit
 ```
 
 The tests are the point of the CI gate: they assert that a support user cannot write, that
@@ -90,8 +99,9 @@ A second CI job fails the build if a tool imports `pg` or touches a session cook
 
 This is the part that replaces Power Apps' authoring experience. The requester describes
 the tool in business terms; Devin does the six steps below; CI refuses anything that
-leaves the paved road. `apps/dsar-console` is the worked example — it was built this way
-after the platform existed, and `docs/RESULTS.md` records what it cost.
+leaves the paved road. `apps/dsar-console` and `apps/complaints-desk` are the worked
+examples — both were built this way after the platform existed, and `docs/RESULTS.md`
+records what they cost.
 
 ### 0. Write the request, not the design
 
@@ -192,6 +202,7 @@ tools = {
   customer-console = { api_port = 4001, web_port = 3001 }
   kyc-queue        = { api_port = 4002, web_port = 3002 }
   dsar-console     = { api_port = 4003, web_port = 3003 }
+  complaints-desk  = { api_port = 4004, web_port = 3004 }
 }
 ```
 

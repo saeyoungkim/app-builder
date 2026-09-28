@@ -44,6 +44,14 @@ const configuration: Configuration = {
       response_types: ["code"],
       token_endpoint_auth_method: "client_secret_basic",
     },
+    {
+      client_id: "complaints-desk",
+      client_secret: process.env.COMPLAINTS_DESK_CLIENT_SECRET ?? "dev-complaints-desk-secret",
+      redirect_uris: [`${process.env.COMPLAINTS_DESK_API_URL ?? "http://localhost:4004"}/auth/callback`],
+      grant_types: ["authorization_code"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "client_secret_basic",
+    },
   ],
   scopes: ["openid", "profile", "email", "groups"],
   claims: {
