@@ -79,6 +79,53 @@ visually empty reason on file (audit event 190). The fix is `justification()` in
 line each, and the whitespace case is now asserted for both. In a per-app world this
 would have been found and fixed once per app, or not at all.
 
+## Tool #4, from a business-terms request
+
+Tool #3 was built by someone who had just written the platform. Tool #4 was built from a
+request written the way a requester would write one, to check that the procedure — not the
+memory of the author — is what carries the cost:
+
+> A queue of customer complaints against existing customers, with the eight-week
+> final-response clock on each one. Support takes complaints on the phone, so they must be
+> able to log one and watch the queue, but only data stewards and compliance admins may
+> close one with an outcome. Region scoping and PII masking as everywhere else, flag the
+> ones past their deadline, and every read, entry and outcome must be in the audit log.
+
+Nothing in that request is about login, roles, masking, audit or deployment. What it cost:
+
+| File | Lines | What it is |
+|---|---|---|
+| `db/migrations/005_complaints.sql` | 22 | the new table and its reference sequence |
+| `packages/data/src/complaints.ts` | 170 | queries — region scope and field policy applied by calling shared helpers |
+| `apps/complaints-desk/api/src/app.ts` | 109 | five routes, two Zod schemas, five `req.audit` calls |
+| `apps/complaints-desk/api/src/server.ts` | 21 | `loadConfig` → `createService` → `listen`, copied |
+| `apps/complaints-desk/web/app/page.tsx` | 228 | queue + log form, composed from `packages/ui` |
+| `apps/complaints-desk/web/app/complaints/[id]/page.tsx` | 110 | detail + outcome screen |
+| `packages/platform/src/rbac.ts` | +11 | three permission strings, assigned to three roles |
+| `services/idp/src/server.ts` | +8 | one OIDC client |
+| `infra/variables.tf` | +4 | one map entry |
+| `package.json` | +2 | two dev scripts |
+
+The interesting line is `rbac.ts`. The request splits one entity across two privilege
+levels — support may create but not close — and that split is three strings in one file,
+not a branch anywhere in the tool. `ken.reviewer` is refused the whole tool without the
+tool knowing he exists.
+
+`tests/complaints-desk.api.test.ts` (10 tests) asserts anonymous 401, KYC reviewer 403,
+support logging a complaint then being refused the close, EMEA-only rows and 404 for an
+APAC complaint, 404 when logging against an out-of-region customer, masked
+`full_name`/`email` for support, `breachedOnly=false` meaning off, 400 on a whitespace
+note, the audit row for the transition, and 409 on closing a closed complaint.
+
+`docs/demo-new-tool.mp4` records the whole run: the three existing tools up, sign-in
+through the local IdP, the six steps, `lint`/`typecheck`/`test` green, and the new tool in
+the browser with `sam.support` logging a complaint and being refused its closure while
+`dana.steward` closes it.
+
+The step the procedure demands and this prototype cannot satisfy is the last one: a named
+owner. The complaints desk has none, for the same reason the other three do not — point 5
+below.
+
 ## Criterion by criterion
 
 | Criterion | Status | Evidence |
