@@ -69,7 +69,7 @@ Both tools were driven through the browser against the local OIDC provider:
   `authorization.denied` rows against the KYC tool.
 
 `terraform validate` passes against `infra/`; `npm run lint`, `npm run typecheck` and the
-42-test suite pass. Tool #3 is covered by tests, not yet by a browser run.
+44-test suite pass. Tool #3 is covered by tests, not yet by a browser run.
 
 One real defect came out of the browser run, and it is the argument for the shared layer
 rather than against it: a KYC decision reason of ten spaces passed `z.string().min(10)`

@@ -110,6 +110,7 @@ export async function resolveRequest(
          closed_at = case when ${terminal} then now() else d.closed_at end
      from customers c
      where d.id = $1 and c.id = d.customer_id and ${scope}
+       and d.status not in ('fulfilled', 'refused')
      returning d.*, c.reference as customer_reference, c.full_name, c.email, c.region`,
     params,
   );

@@ -15,6 +15,14 @@ export function justification(min = 10, max = 1000): z.ZodType<string, z.ZodType
     .pipe(z.string().min(min));
 }
 
+/**
+ * A query-string boolean. `z.coerce.boolean()` is a trap here: it returns true for the
+ * string "false", so a filter a user switched off silently stays on.
+ */
+export function booleanFlag(): z.ZodType<boolean, z.ZodTypeDef, unknown> {
+  return z.union([z.boolean(), z.enum(["true", "false", "1", "0"])]).transform((v) => v === true || v === "true" || v === "1");
+}
+
 /** Express 5 types a route param as string | string[]; tools must not guess. */
 export function routeParam(req: Request, name: string): string {
   const value = req.params[name];

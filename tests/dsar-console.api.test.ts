@@ -46,6 +46,23 @@ describe("tool #3 inherits the platform's authorization", () => {
     expect([...new Set(list.body.rows.map((r: { region: string }) => r.region))]).toEqual(["EMEA"]);
   });
 
+  it("treats overdueOnly=false as off rather than on", async () => {
+    const cookie = await cookieFor(PRINCIPALS.stewardGlobal);
+    const off = await request(app).get("/api/requests?overdueOnly=false&limit=100").set("Cookie", cookie);
+    const on = await request(app).get("/api/requests?overdueOnly=true&limit=100").set("Cookie", cookie);
+    expect(off.status).toBe(200);
+    expect(off.body.rows.length).toBeGreaterThan(on.body.rows.length);
+  });
+
+  it("audits the queue statistics read", async () => {
+    const res = await request(app).get("/api/stats").set("Cookie", await cookieFor(PRINCIPALS.supportEmea));
+    expect(res.status).toBe(200);
+    const audit = await service.db.query(
+      `select 1 from audit_log where tool = 'dsar-console-test' and action = 'dsar.stats.read' limit 1`,
+    );
+    expect(audit.rowCount).toBe(1);
+  });
+
   it("masks customer PII on the wire for a role without customer:read_pii", async () => {
     const res = await request(app).get(`/api/requests/${emeaOpenId}`).set("Cookie", await cookieFor(PRINCIPALS.supportEmea));
     expect(res.status).toBe(200);

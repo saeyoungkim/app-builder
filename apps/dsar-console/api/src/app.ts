@@ -1,5 +1,5 @@
 import { getRequest, listRequests, resolveRequest, slaStats } from "@paved/data";
-import { HttpError, justification, routeParam, type Service } from "@paved/platform";
+import { HttpError, booleanFlag, justification, routeParam, type Service } from "@paved/platform";
 import { z } from "zod";
 
 export function buildApp(service: Service): void {
@@ -8,7 +8,7 @@ export function buildApp(service: Service): void {
   const listQuery = z.object({
     status: z.enum(["open", "in_progress", "fulfilled", "refused"]).optional(),
     requestType: z.enum(["access", "erasure", "correction", "portability"]).optional(),
-    overdueOnly: z.coerce.boolean().optional(),
+    overdueOnly: booleanFlag().optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
     offset: z.coerce.number().int().min(0).optional(),
   });
@@ -30,7 +30,9 @@ export function buildApp(service: Service): void {
 
   app.get("/api/stats", requirePermission("dsar:read"), async (req, res, next) => {
     try {
-      res.json({ stats: await slaStats(db, req.principal!) });
+      const stats = await slaStats(db, req.principal!);
+      await req.audit({ action: "dsar.stats.read", resourceType: "dsar_request" });
+      res.json({ stats });
     } catch (err) {
       next(err);
     }
@@ -65,8 +67,9 @@ export function buildApp(service: Service): void {
       if (before.status === "fulfilled" || before.status === "refused") {
         throw new HttpError(409, "request_already_closed");
       }
+      // The update refuses closed rows too, so a miss here means someone else closed it first.
       const after = await resolveRequest(db, req.principal!, routeParam(req, "id"), resolution, note);
-      if (!after) throw new HttpError(404, "request_not_found");
+      if (!after) throw new HttpError(409, "request_already_closed");
       await req.audit({
         action: "dsar.request.resolve",
         resourceType: "dsar_request",
