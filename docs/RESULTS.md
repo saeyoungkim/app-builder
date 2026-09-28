@@ -25,6 +25,21 @@ The honest caveat: the two tools share a domain. A tool over an unrelated data s
 pay to add that source to `packages/data` — perhaps a day — but would still inherit identity,
 roles, scoping, masking, audit, components, deployment and the CI gate unchanged.
 
+## Verified end to end
+
+Both tools were driven through the browser against the local OIDC provider:
+
+- `sam.support` (internal-support, region-EMEA) — sees 37 EMEA customers of 120, every PII
+  field masked server-side, audit page refused, KYC queue refused (`forbidden`).
+- `ken.reviewer` (kyc-reviewers, region-APAC) — sees only APAC cases, opens a case with
+  unmasked customer identity, escalates KYC-50068 with a stored reason.
+- `avery.admin` (compliance-admins, region-global) — audit page shows both tools in one log:
+  `customer.list`, `kyc.case.read`, `kyc.case.decide`, and the support user's two
+  `authorization.denied` rows against the KYC tool.
+
+`terraform validate` passes against `infra/`; `npm run lint`, `npm run typecheck` and the
+32-test suite pass.
+
 ## Criterion by criterion
 
 | Criterion | Status | Evidence |
