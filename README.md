@@ -101,7 +101,8 @@ This is the part that replaces Power Apps' authoring experience. The requester d
 the tool in business terms; Devin does the six steps below; CI refuses anything that
 leaves the paved road. `apps/dsar-console` and `apps/complaints-desk` are the worked
 examples — both were built this way after the platform existed, and `docs/RESULTS.md`
-records what they cost.
+records what they cost. `docs/NEW-TOOL-PROMPT.md` is the fill-in-the-blanks prompt that
+turns the six steps below into the brief you hand to Devin.
 
 ### 0. Write the request, not the design
 
