@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: devuser
+          POSTGRES_PASSWORD: devpass
+          POSTGRES_DB: paved
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U devuser"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://devuser:devpass@localhost:5432/paved
+      SESSION_SECRET: ci-session-secret-value
+      IDP_ISSUER: http://localhost:9000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Migrate and seed synthetic data
+        run: npm run db:reset
+
+      # The gate that matters: no tool ships if authorization, region scoping,
+      # PII masking or the append-only audit log regress.
+      - name: Authorization, masking and audit tests
+        run: npm test
+
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Policy as code: a tool may not reach the database or read a cookie on its
+      # own. Both go through the platform package, so a bypass is a CI failure,
+      # not a review comment someone might miss.
+      - name: No direct database or session access outside the platform
+        run: |
+          set -e
+          if grep -rnE "from \"pg\"|require\(.pg.\)" apps/ | grep -v node_modules; then
+            echo "A tool imported the database driver directly. Use @paved/data."
+            exit 1
+          fi
+          if grep -rn "jwtVerify\|paved_session" apps/ | grep -v node_modules; then
+            echo "A tool handled sessions directly. Use the platform's requirePermission."
+            exit 1
+          fi
+
+      - name: No production data in the repository
+        run: |
+          set -e
+          if grep -rnE "@(gmail|outlook|yahoo)\.com" db/ apps/ packages/ | grep -v node_modules; then
+            echo "Real-looking email addresses found. Synthetic data only."
+            exit 1
+          fi

@@ -1,0 +1,12 @@
+FROM node:22-slim
+ARG TOOL
+WORKDIR /srv
+
+COPY package.json package-lock.json ./
+COPY packages ./packages
+COPY apps/${TOOL}/web ./apps/${TOOL}/web
+RUN npm ci --workspaces --include-workspace-root
+RUN npm run build -w ./apps/${TOOL}/web
+
+ENV TOOL=${TOOL}
+CMD ["sh", "-c", "npm run start -w ./apps/$TOOL/web"]

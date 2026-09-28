@@ -1,0 +1,17 @@
+{
+  "name": "@paved/idp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-strip-types src/server.ts",
+    "start": "node --experimental-strip-types src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "oidc-provider": "^8.6.1"
+  },
+  "devDependencies": {
+    "@types/oidc-provider": "^8.8.1"
+  }
+}

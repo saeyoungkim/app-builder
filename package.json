@@ -1,0 +1,47 @@
+{
+  "name": "paved-road",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Internal-tools paved road: shared platform, component library, and two tools built on it.",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*/api",
+    "apps/*/web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:packages": "npm run build -w @paved/platform && npm run build -w @paved/data && npm run build -w @paved/ui",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:migrate": "node --experimental-strip-types db/migrate.ts",
+    "db:seed": "node --experimental-strip-types db/seed/seed.ts",
+    "db:reset": "npm run db:migrate && npm run db:seed",
+    "dev": "concurrently -n idp,cc-api,cc-web,kyc-api,kyc-web -c cyan,green,greenBright,magenta,magentaBright \"npm:dev:idp\" \"npm:dev:cc-api\" \"npm:dev:cc-web\" \"npm:dev:kyc-api\" \"npm:dev:kyc-web\"",
+    "dev:idp": "npm run dev -w @paved/idp",
+    "dev:cc-api": "npm run dev -w @paved/customer-console-api",
+    "dev:cc-web": "npm run dev -w @paved/customer-console-web",
+    "dev:kyc-api": "npm run dev -w @paved/kyc-queue-api",
+    "dev:kyc-web": "npm run dev -w @paved/kyc-queue-web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.1",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.0.1",
+    "@types/supertest": "^6.0.2",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.16.0",
+    "supertest": "^7.0.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0",
+    "vitest": "^2.1.8"
+  }
+}
