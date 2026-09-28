@@ -1,5 +1,5 @@
 import { decideCase, getCase, listCases, queueStats } from "@paved/data";
-import { HttpError, routeParam, type Service } from "@paved/platform";
+import { HttpError, justification, routeParam, type Service } from "@paved/platform";
 import { z } from "zod";
 
 export function buildApp(service: Service): void {
@@ -53,7 +53,7 @@ export function buildApp(service: Service): void {
 
   const decisionBody = z.object({
     decision: z.enum(["approved", "rejected", "escalated", "in_review"]),
-    reason: z.string().min(10).max(1000),
+    reason: justification(),
   });
 
   app.post("/api/cases/:id/decision", requirePermission("kyc:case:decide"), async (req, res, next) => {

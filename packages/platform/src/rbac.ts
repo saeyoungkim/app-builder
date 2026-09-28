@@ -9,13 +9,22 @@ export type Permission =
   | "customer:note:write"
   | "kyc:case:read"
   | "kyc:case:decide"
+  | "dsar:read"
+  | "dsar:resolve"
   | "audit:read";
 
 export type Role = "support" | "data-steward" | "kyc-reviewer" | "compliance-admin";
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  support: ["customer:read", "customer:note:write"],
-  "data-steward": ["customer:read", "customer:read_pii", "customer:write", "customer:note:write"],
+  support: ["customer:read", "customer:note:write", "dsar:read"],
+  "data-steward": [
+    "customer:read",
+    "customer:read_pii",
+    "customer:write",
+    "customer:note:write",
+    "dsar:read",
+    "dsar:resolve",
+  ],
   "kyc-reviewer": ["customer:read", "customer:read_pii", "kyc:case:read", "kyc:case:decide"],
   "compliance-admin": [
     "customer:read",
@@ -24,6 +33,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "customer:note:write",
     "kyc:case:read",
     "kyc:case:decide",
+    "dsar:read",
+    "dsar:resolve",
     "audit:read",
   ],
 };

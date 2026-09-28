@@ -28,7 +28,9 @@ function rng(seed: number): () => number {
 const rand = rng(20260928);
 const pick = <T>(items: readonly T[]): T => items[Math.floor(rand() * items.length)] as T;
 
-await pool.query("truncate kyc_documents, kyc_cases, customer_notes, customers restart identity cascade");
+await pool.query(
+  "truncate dsar_requests, kyc_documents, kyc_cases, customer_notes, customers restart identity cascade",
+);
 
 const CUSTOMER_COUNT = 120;
 const customerIds: { id: string; region: string }[] = [];
@@ -114,8 +116,44 @@ for (const customer of customerIds) {
   }
 }
 
-const counts = await pool.query<{ customers: string; cases: string }>(
-  `select (select count(*) from customers) as customers, (select count(*) from kyc_cases) as cases`,
+const DSAR_TYPES = ["access", "erasure", "correction", "portability"] as const;
+let dsarIndex = 0;
+for (const customer of customerIds) {
+  if (rand() > 0.3) continue;
+  dsarIndex += 1;
+  const roll = rand();
+  const status = roll < 0.4 ? "open" : roll < 0.6 ? "in_progress" : roll < 0.88 ? "fulfilled" : "refused";
+  const closed = status === "fulfilled" || status === "refused";
+  const receivedDaysAgo = Math.floor(rand() * 45);
+  const received = new Date(Date.now() - receivedDaysAgo * 86_400_000);
+  await pool.query(
+    `insert into dsar_requests
+       (reference, customer_id, request_type, status, received_at, due_at, closed_at, closed_by, resolution_note)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [
+      `DSR-${String(70_000 + dsarIndex)}`,
+      customer.id,
+      pick(DSAR_TYPES),
+      status,
+      received,
+      new Date(received.getTime() + 30 * 86_400_000),
+      closed ? new Date(received.getTime() + Math.floor(rand() * 20) * 86_400_000) : null,
+      closed ? "dana.steward@example-synthetic.test" : null,
+      closed
+        ? status === "fulfilled"
+          ? "Export delivered through the secure channel after identity verification."
+          : "Refused: retention obligation under AML rules overrides erasure."
+        : null,
+    ],
+  );
+}
+
+const counts = await pool.query<{ customers: string; cases: string; dsars: string }>(
+  `select (select count(*) from customers) as customers,
+          (select count(*) from kyc_cases) as cases,
+          (select count(*) from dsar_requests) as dsars`,
 );
-console.log(`seeded ${counts.rows[0]?.customers} customers and ${counts.rows[0]?.cases} KYC cases (synthetic)`);
+console.log(
+  `seeded ${counts.rows[0]?.customers} customers, ${counts.rows[0]?.cases} KYC cases and ${counts.rows[0]?.dsars} data subject requests (synthetic)`,
+);
 await pool.end();

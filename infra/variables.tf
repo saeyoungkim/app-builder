@@ -46,5 +46,9 @@ variable "tools" {
       api_port = 4002
       web_port = 3002
     }
+    dsar-console = {
+      api_port = 4003
+      web_port = 3003
+    }
   }
 }
