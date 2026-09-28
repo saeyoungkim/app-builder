@@ -1,0 +1,11 @@
+FROM node:22-slim
+ARG TOOL
+WORKDIR /srv
+
+COPY package.json package-lock.json ./
+COPY packages ./packages
+COPY apps/${TOOL}/api ./apps/${TOOL}/api
+RUN npm ci --omit=dev --workspaces --include-workspace-root
+
+ENV TOOL=${TOOL}
+CMD ["sh", "-c", "node --experimental-strip-types apps/$TOOL/api/src/server.ts"]
