@@ -59,6 +59,15 @@ describe("decisions", () => {
     expect(res.body.error).toBe("invalid_request");
   });
 
+  it("does not accept whitespace as a reason", async () => {
+    const res = await request(app)
+      .post(`/api/cases/${apacPendingCaseId}/decision`)
+      .set("Cookie", await cookieFor(PRINCIPALS.reviewerApac))
+      .send({ decision: "approved", reason: "          " });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("invalid_request");
+  });
+
   it("records the decision with its reviewer and reason in the shared audit log", async () => {
     const res = await request(app)
       .post(`/api/cases/${apacPendingCaseId}/decision`)

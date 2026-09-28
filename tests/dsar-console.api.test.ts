@@ -73,6 +73,15 @@ describe("resolutions", () => {
     expect(res.body.error).toBe("invalid_request");
   });
 
+  it("does not accept whitespace as a note", async () => {
+    const res = await request(app)
+      .post(`/api/requests/${emeaOpenId}/resolution`)
+      .set("Cookie", await cookieFor(PRINCIPALS.stewardGlobal))
+      .send({ resolution: "fulfilled", note: "          " });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("invalid_request");
+  });
+
   it("records the actor, note and transition in the shared audit log", async () => {
     const res = await request(app)
       .post(`/api/requests/${emeaOpenId}/resolution`)

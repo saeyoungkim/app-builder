@@ -78,7 +78,7 @@ in-app admin screen that can grant someone a permission the directory did not.
 ```bash
 npm run lint
 npm run typecheck
-npm test          # 40 tests: authorization, region scope, PII masking, audit
+npm test          # 42 tests: authorization, region scope, PII masking, audit
 ```
 
 The tests are the point of the CI gate: they assert that a support user cannot write, that

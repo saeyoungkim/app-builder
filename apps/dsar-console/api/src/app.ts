@@ -1,5 +1,5 @@
 import { getRequest, listRequests, resolveRequest, slaStats } from "@paved/data";
-import { HttpError, routeParam, type Service } from "@paved/platform";
+import { HttpError, justification, routeParam, type Service } from "@paved/platform";
 import { z } from "zod";
 
 export function buildApp(service: Service): void {
@@ -54,7 +54,7 @@ export function buildApp(service: Service): void {
 
   const resolutionBody = z.object({
     resolution: z.enum(["in_progress", "fulfilled", "refused"]),
-    note: z.string().min(10).max(1000),
+    note: justification(),
   });
 
   app.post("/api/requests/:id/resolution", requirePermission("dsar:resolve"), async (req, res, next) => {

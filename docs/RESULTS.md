@@ -69,7 +69,15 @@ Both tools were driven through the browser against the local OIDC provider:
   `authorization.denied` rows against the KYC tool.
 
 `terraform validate` passes against `infra/`; `npm run lint`, `npm run typecheck` and the
-40-test suite pass. Tool #3 is covered by tests, not yet by a browser run.
+42-test suite pass. Tool #3 is covered by tests, not yet by a browser run.
+
+One real defect came out of the browser run, and it is the argument for the shared layer
+rather than against it: a KYC decision reason of ten spaces passed `z.string().min(10)`
+server-side while the UI's own check rejected it, so a case could be closed with a
+visually empty reason on file (audit event 190). The fix is `justification()` in
+`packages/platform`, which trims before measuring; both tools picked it up by changing one
+line each, and the whitespace case is now asserted for both. In a per-app world this
+would have been found and fixed once per app, or not at all.
 
 ## Criterion by criterion
 
