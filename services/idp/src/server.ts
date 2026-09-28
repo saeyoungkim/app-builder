@@ -57,8 +57,10 @@ const configuration: Configuration = {
   findAccount: async (_ctx, id) => {
     const user = findUser(id);
     if (!user) return undefined;
+    // accountId must echo the id the session was established with, otherwise the
+    // grant and the session disagree. The stable directory id is the `sub` claim.
     return {
-      accountId: user.sub,
+      accountId: id,
       claims: async () => ({
         sub: user.sub,
         email: user.email,
@@ -71,6 +73,10 @@ const configuration: Configuration = {
 
 const provider = new Provider(issuer, configuration);
 provider.proxy = true;
+
+provider.on("server_error", (_ctx, err) => {
+  process.stderr.write(`[idp] server_error: ${err.stack ?? String(err)}\n`);
+});
 
 provider.listen(port, () => {
   process.stdout.write(`[idp] local OIDC provider on ${issuer}\n`);
