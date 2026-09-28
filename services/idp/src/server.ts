@@ -36,6 +36,14 @@ const configuration: Configuration = {
       response_types: ["code"],
       token_endpoint_auth_method: "client_secret_basic",
     },
+    {
+      client_id: "dsar-console",
+      client_secret: process.env.DSAR_CONSOLE_CLIENT_SECRET ?? "dev-dsar-console-secret",
+      redirect_uris: [`${process.env.DSAR_CONSOLE_API_URL ?? "http://localhost:4003"}/auth/callback`],
+      grant_types: ["authorization_code"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "client_secret_basic",
+    },
   ],
   scopes: ["openid", "profile", "email", "groups"],
   claims: {

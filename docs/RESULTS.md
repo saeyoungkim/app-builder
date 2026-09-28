@@ -25,6 +25,37 @@ The honest caveat: the two tools share a domain. A tool over an unrelated data s
 pay to add that source to `packages/data` — perhaps a day — but would still inherit identity,
 roles, scoping, masking, audit, components, deployment and the CI gate unchanged.
 
+## Tool #3, built after the fact
+
+Tool #3 (DSAR console — a data-subject-request queue with an SLA clock) was added later,
+by following `docs/ADDING-A-TOOL.md`, to check that the curve stays flat rather than
+flattening only because tools #1 and #2 were written together.
+
+Everything written for a new entity, a new permission pair and two screens:
+
+| File | Lines | What it is |
+|---|---|---|
+| `db/migrations/004_dsar.sql` | 17 | the new table |
+| `packages/data/src/dsar.ts` | 136 | queries — region scope and field policy applied by calling shared helpers |
+| `apps/dsar-console/api/src/app.ts` | 82 | four routes, a Zod body, four `req.audit` calls |
+| `apps/dsar-console/api/src/server.ts` | 21 | `loadConfig` → `createService` → `listen` |
+| `apps/dsar-console/web/app/page.tsx` | 141 | list screen, composed from `packages/ui` |
+| `apps/dsar-console/web/app/requests/[id]/page.tsx` | 104 | detail + resolution screen |
+| `packages/platform/src/rbac.ts` | +11 | two permission strings, assigned to three roles |
+| `services/idp/src/server.ts` | +8 | one OIDC client |
+| `infra/variables.tf` | +4 | one map entry |
+| `package.json` | +2 | two dev scripts |
+
+No authentication, session, cookie, JWT, masking, scoping or audit-sink code was written;
+the policy CI job would have failed the build if any had been. The new permissions
+(`dsar:read`, `dsar:resolve`) fan out to roles in one place, so `ken.reviewer` is refused
+the new tool without the tool knowing he exists.
+
+`tests/dsar-console.api.test.ts` (8 tests) asserts anonymous 401, KYC reviewer 403,
+EMEA-only rows and 404 for an APAC request, masked `full_name`/`email` for support,
+403 on resolve as support, 400 on a thin note, the audit row for the transition, and
+409 on re-closing a closed request.
+
 ## Verified end to end
 
 Both tools were driven through the browser against the local OIDC provider:
@@ -38,7 +69,7 @@ Both tools were driven through the browser against the local OIDC provider:
   `authorization.denied` rows against the KYC tool.
 
 `terraform validate` passes against `infra/`; `npm run lint`, `npm run typecheck` and the
-32-test suite pass.
+40-test suite pass. Tool #3 is covered by tests, not yet by a browser run.
 
 ## Criterion by criterion
 
