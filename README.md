@@ -184,6 +184,7 @@ group→role mapping; it is not an identity service and must never run outside d
 | `sam.support@example-synthetic.test` | `internal-support`, `region-EMEA` | EMEA customers, DSARs and complaints, all PII masked, no edit, no KYC; can log a complaint but not close one, cannot resolve a DSAR; can view locked accounts but not unlock one |
 | `dana.steward@example-synthetic.test` | `data-stewards`, `region-global` | every region, PII in the clear, can edit, resolve DSARs and close complaints — but no KYC decisions and no account-unlock access |
 | `ken.reviewer@example-synthetic.test` | `kyc-reviewers`, `region-APAC` | APAC KYC cases only, can decide; no DSAR, complaint or account-unlock access |
+| `sasha.secops@example-synthetic.test` | `security-ops`, `region-global` | every region, customer PII in the clear, can view and unlock locked accounts; no edits, no KYC decisions, no DSAR resolution, no complaint closing, no audit log access |
 | `avery.admin@example-synthetic.test` | `compliance-admins`, `region-global` | everything, including unlocking accounts and the audit log |
 
 Roles come from directory groups only. There is no user-role table to drift, and no
@@ -194,7 +195,7 @@ in-app admin screen that can grant someone a permission the directory did not.
 ```bash
 npm run lint
 npm run typecheck
-npm test          # 66 tests: authorization, region scope, PII masking, audit
+npm test          # 67 tests: authorization, region scope, PII masking, audit
 ```
 
 The tests are the point of the CI gate: they assert that a support user cannot write, that

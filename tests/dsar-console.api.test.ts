@@ -11,10 +11,30 @@ let emeaOpenId = "";
 let apacRequestId = "";
 
 beforeAll(async () => {
-  const emea = await service.db.query<{ id: string }>(
+  let emea = await service.db.query<{ id: string }>(
     `select d.id from dsar_requests d join customers c on c.id = d.customer_id
      where c.region = 'EMEA' and d.status in ('open','in_progress') limit 1`,
   );
+  if (emea.rows.length === 0) {
+    const existing = await service.db.query<{ id: string }>(
+      `select d.id from dsar_requests d join customers c on c.id = d.customer_id where c.region = 'EMEA' limit 1`,
+    );
+    if (existing.rows.length > 0) {
+      emea = await service.db.query<{ id: string }>(
+        `update dsar_requests set status = 'open', closed_at = null, closed_by = null, resolution_note = null
+         where id = $1 returning id`,
+        [existing.rows[0]!.id],
+      );
+    } else {
+      const customer = await service.db.query<{ id: string }>(`select id from customers where region = 'EMEA' limit 1`);
+      emea = await service.db.query<{ id: string }>(
+        `insert into dsar_requests (reference, customer_id, request_type, status, received_at, due_at)
+         values ('DSR-TEST-' || substr(md5(random()::text), 1, 6), $1, 'access', 'open', now(), now() + interval '30 days')
+         returning id`,
+        [customer.rows[0]!.id],
+      );
+    }
+  }
   const apac = await service.db.query<{ id: string }>(
     `select d.id from dsar_requests d join customers c on c.id = d.customer_id
      where c.region = 'APAC' limit 1`,

@@ -11,10 +11,30 @@ let emeaLockedId = "";
 let apacLockId = "";
 
 beforeAll(async () => {
-  const emea = await service.db.query<{ id: string }>(
+  let emea = await service.db.query<{ id: string }>(
     `select l.id from account_locks l join customers c on c.id = l.customer_id
      where c.region = 'EMEA' and l.status = 'locked' limit 1`,
   );
+  if (emea.rows.length === 0) {
+    const existing = await service.db.query<{ id: string }>(
+      `select l.id from account_locks l join customers c on c.id = l.customer_id where c.region = 'EMEA' limit 1`,
+    );
+    if (existing.rows.length > 0) {
+      emea = await service.db.query<{ id: string }>(
+        `update account_locks set status = 'locked', unlocked_at = null, unlocked_by = null, unlock_note = null
+         where id = $1 returning id`,
+        [existing.rows[0]!.id],
+      );
+    } else {
+      const customer = await service.db.query<{ id: string }>(`select id from customers where region = 'EMEA' limit 1`);
+      emea = await service.db.query<{ id: string }>(
+        `insert into account_locks (reference, customer_id, lock_reason, channel, failed_attempts, last_failed_at, locked_at, status)
+         values ('LCK-TEST-' || substr(md5(random()::text), 1, 6), $1, 'password', 'web', 5, now(), now(), 'locked')
+         returning id`,
+        [customer.rows[0]!.id],
+      );
+    }
+  }
   const apac = await service.db.query<{ id: string }>(
     `select l.id from account_locks l join customers c on c.id = l.customer_id
      where c.region = 'APAC' limit 1`,
@@ -137,5 +157,22 @@ describe("tool #5 inherits the platform's authorization", () => {
       .set("Cookie", cookie)
       .send({ note: "Trying to unlock it a second time." });
     expect(again.status).toBe(409);
+  });
+
+  it("lets security-ops unlock with a justification and audits it", async () => {
+    await service.db.query(
+      `update account_locks set status = 'locked', unlocked_at = null, unlocked_by = null, unlock_note = null where id = $1`,
+      [emeaLockedId],
+    );
+    const cookie = await cookieFor(PRINCIPALS.secops);
+    const note = "Identity verified via security questions and SMS OTP.";
+    const res = await request(app).post(`/api/locks/${emeaLockedId}/unlock`).set("Cookie", cookie).send({ note });
+    expect(res.status).toBe(200);
+    expect(res.body.lock.status).toBe("unlocked");
+    expect(res.body.lock.unlocked_by).toBe(PRINCIPALS.secops.email);
+    expect(res.body.lock.unlock_note).toBe(note);
+
+    const audit = await latestAudit("account_lock.unlock", PRINCIPALS.secops.email, emeaLockedId);
+    expect(audit?.subject_id).toBe(res.body.lock.customer_reference);
   });
 });

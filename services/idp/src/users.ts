@@ -35,6 +35,12 @@ export const USERS: DirectoryUser[] = [
     name: "Avery Admin",
     groups: ["compliance-admins", "region-global"],
   },
+  {
+    sub: "u-secops",
+    email: "sasha.secops@example-synthetic.test",
+    name: "Sasha SecOps",
+    groups: ["security-ops", "region-global"],
+  },
 ];
 
 export function findUser(login: string): DirectoryUser | undefined {

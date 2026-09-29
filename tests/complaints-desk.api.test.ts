@@ -13,10 +13,22 @@ let emeaCustomerRef = "";
 let apacCustomerRef = "";
 
 beforeAll(async () => {
-  const emea = await service.db.query<{ id: string }>(
+  let emea = await service.db.query<{ id: string }>(
     `select k.id from complaints k join customers c on c.id = k.customer_id
      where c.region = 'EMEA' and k.status in ('open','investigating') limit 1`,
   );
+  if (emea.rows.length === 0) {
+    const existing = await service.db.query<{ id: string }>(
+      `select k.id from complaints k join customers c on c.id = k.customer_id where c.region = 'EMEA' limit 1`,
+    );
+    if (existing.rows.length > 0) {
+      emea = await service.db.query<{ id: string }>(
+        `update complaints set status = 'open', closed_at = null, closed_by = null, outcome_note = null
+         where id = $1 returning id`,
+        [existing.rows[0]!.id],
+      );
+    }
+  }
   const apac = await service.db.query<{ id: string }>(
     `select k.id from complaints k join customers c on c.id = k.customer_id
      where c.region = 'APAC' limit 1`,

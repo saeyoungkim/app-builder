@@ -28,6 +28,12 @@ export const PRINCIPALS = {
     name: "Avery Admin",
     groups: ["compliance-admins", "region-global"],
   }),
+  secops: principalFromClaims({
+    sub: "u-secops",
+    email: "sasha.secops@example-synthetic.test",
+    name: "Sasha SecOps",
+    groups: ["security-ops", "region-global"],
+  }),
   nobody: principalFromClaims({ sub: "u-nobody", email: "no.one@example-synthetic.test", groups: [] }),
 } satisfies Record<string, Principal>;
 

@@ -11,10 +11,22 @@ let apacPendingCaseId = "";
 let emeaCaseId = "";
 
 beforeAll(async () => {
-  const apac = await service.db.query<{ id: string }>(
+  let apac = await service.db.query<{ id: string }>(
     `select k.id from kyc_cases k join customers c on c.id = k.customer_id
      where c.region = 'APAC' and k.status in ('pending','in_review','escalated') limit 1`,
   );
+  if (apac.rows.length === 0) {
+    const existing = await service.db.query<{ id: string }>(
+      `select k.id from kyc_cases k join customers c on c.id = k.customer_id where c.region = 'APAC' limit 1`,
+    );
+    if (existing.rows.length > 0) {
+      apac = await service.db.query<{ id: string }>(
+        `update kyc_cases set status = 'pending', decided_at = null, decided_by = null, decision_reason = null
+         where id = $1 returning id`,
+        [existing.rows[0]!.id],
+      );
+    }
+  }
   const emea = await service.db.query<{ id: string }>(
     `select k.id from kyc_cases k join customers c on c.id = k.customer_id where c.region = 'EMEA' limit 1`,
   );

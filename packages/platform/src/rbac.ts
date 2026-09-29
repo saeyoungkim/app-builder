@@ -18,7 +18,7 @@ export type Permission =
   | "account_lock:unlock"
   | "audit:read";
 
-export type Role = "support" | "data-steward" | "kyc-reviewer" | "compliance-admin";
+export type Role = "support" | "data-steward" | "kyc-reviewer" | "compliance-admin" | "security-ops";
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   support: [
@@ -41,6 +41,12 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "complaint:close",
   ],
   "kyc-reviewer": ["customer:read", "customer:read_pii", "kyc:case:read", "kyc:case:decide"],
+  "security-ops": [
+    "customer:read",
+    "customer:read_pii",
+    "account_lock:read",
+    "account_lock:unlock",
+  ],
   "compliance-admin": [
     "customer:read",
     "customer:read_pii",
@@ -63,6 +69,7 @@ const GROUP_TO_ROLE: Record<string, Role> = {
   "internal-support": "support",
   "data-stewards": "data-steward",
   "kyc-reviewers": "kyc-reviewer",
+  "security-ops": "security-ops",
   "compliance-admins": "compliance-admin",
 };
 
