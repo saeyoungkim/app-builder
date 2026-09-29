@@ -1,17 +1,124 @@
 # Paved road — internal tools prototype
 
-A prototype that answers one question: **what does the *next* internal tool cost?**
+Build the tools as fast as you can with reusing the shared platform and data models
 
-`docs/demo-new-tool.mp4` is a recorded run of the procedure below: a fourth tool written
-from a business-terms request, the checks passing, and the tool live with one role logging
-a complaint and another refused.
+## Background
+
+A prototype that answers one question: **what does the *next* internal tool cost?**
 
 Power Apps makes tool #1 cheap. The argument for owning the stack only works if tool #11
 is cheaper still, and that depends entirely on what a new tool inherits rather than
 rebuilds. So this repository is a shared platform plus four tools built on it, and the
 interesting number is not the first one.
 
-Everything here is synthetic. No production data, no real customers, no money movement.
+## How to create a new tool
+
+1. Clone this repository to your repo
+2. Connect your repo to devin
+3. Describe the tool in business terms and devin cloud finishes the rest!
+4. Check the output and fix the spec of app with devin until it meets
+
+### Example of prompts to create new one
+
+A usable request states the entity, who may see it, who may change it, and what must be
+recorded. Everything else is the platform's problem:
+
+> A queue of GDPR data-subject requests against existing customers. Support can see the
+> queue but not close anything; data stewards and compliance admins can resolve a request
+> with a note. Region scoping and PII masking as everywhere else. 30-day SLA, flag the
+> breaches, and every read and resolution must be in the audit log.
+
+Note what is absent: no login, no roles table, no masking rules, no audit plumbing, no
+deployment. Asking for those is a sign the request is being over-specified.
+
+### The image of Devin Cloud Development Workflow
+
+![Devin Cloud Development Workflow](docs/images/devin-workflow.jpg)
+
+The loop between Devin Cloud and CI is self-correcting: if Devin attempts to write raw SQL
+in an app or forgets PII masking, the architecture policy and refusal test suite fail the build,
+forcing Devin back onto the paved road before human review.
+
+### Output
+#### 1. Data
+
+```
+db/migrations/00X_<entity>.sql      # the raw data schema
+packages/data/src/<entity>.ts       # queries + its FieldPolicy
+```
+
+The access module declares which columns are PII and applies the region scope; tools call
+it and never write SQL, so masking and row-level scope cannot be forgotten in a template.
+
+for example:
+
+```ts
+const DSAR_FIELD_POLICY = { full_name: "pii", email: "pii" } as const;
+// every read returns applyFieldPolicy(row, DSAR_FIELD_POLICY, principal)
+```
+
+#### 2. Permissions
+
+Add the permission and give it to roles in `packages/platform/src/rbac.ts`:
+
+```ts
+type Permission = ... | "dsar:read" | "dsar:resolve";
+
+support:            [... "dsar:read"]                 // may watch the queue, not close it
+"data-steward":     [... "dsar:read", "dsar:resolve"]
+"kyc-reviewer":     [...]                             // omitted → refused, silently and by default
+```
+
+A role that is not listed is refused. New tools are deny-by-default without the tool
+containing any authorization logic.
+
+#### 3. API
+
+```
+apps/<tool>/api/src/server.ts   # loadConfig + createService + buildApp + listen (~20 lines, copy it)
+apps/<tool>/api/src/app.ts      # routes only
+```
+
+Each route names the permission it needs and records what it did:
+
+```ts
+app.post("/api/requests/:id/resolution", requirePermission("dsar:resolve"), async (req, res, next) => {
+  const { resolution, note } = resolutionBody.parse(req.body);   // your domain rules
+  const row = await resolveRequest(db, req.principal!, id, resolution, note);
+  await req.audit({ action: "dsar.request.resolve", resourceType: "dsar_request", resourceId: id });
+  res.json(row);
+});
+```
+
+If you catch yourself writing `jwtVerify`, importing `pg`, or reading a cookie: stop. The
+`policy` CI job fails the build, and the thing you need belongs in `packages/platform` so
+every tool gets it.
+
+#### 4. Web
+
+```
+apps/<tool>/web/app/layout.tsx providers.tsx page.tsx
+```
+
+Build screens from `AppShell`, `DataTable`, `FilterBar`, `Card`, `DetailList`, `Pill`,
+`Button` and the inputs. `IfPermitted` hides actions the user cannot take — remember that
+hiding is cosmetic and the API is what actually refuses. Needing a new primitive is fine;
+put it in `packages/ui` so tool #12 inherits it.
+
+#### 5. Infra
+
+```hcl
+# infra/variables.tf
+<tool> = { api_port = 400X, web_port = 300X }
+```
+
+plus an OIDC client in `services/idp`, two `dev:` scripts in `package.json`, and a test
+file asserting who is refused — the 403s and the out-of-region 404, not just the happy
+path. Then `npm run lint && npm run typecheck && npm test`, and open a PR.
+
+Last and most important: give the tool a **named owner** in the catalogue. A tool without
+one is the failure mode this platform exists to prevent.
+
 
 ## What is shared vs. what a tool writes
 
@@ -22,27 +129,23 @@ Everything here is synthetic. No production data, no real customers, no money mo
 | Row-level region scope | `packages/platform` + `packages/data` | nothing |
 | Field-level PII masking | `packages/platform/src/field-policy.ts` | a field classification, once per entity |
 | Audit log (append-only) | `packages/platform/src/audit.ts` | one `req.audit({...})` per meaningful action |
-| Customer / KYC / DSAR / complaint data access | `packages/data` | a query call |
+| Created apps data access | `packages/data` | a query call |
 | Grids, filters, forms, detail panes, app shell | `packages/ui` | composition |
 | Container topology, environments | `infra/` | a map entry in `infra/variables.tf` |
 | Authorization + policy gate | `.github/workflows/ci.yml` | nothing |
 
-The four tools:
+The four tools as examples:
 
 - **`apps/customer-console`** — tool #1. Search, list, detail, edit and note customer
   records, with PII masking and region scoping.
 - **`apps/kyc-queue`** — tool #2. A review queue over the same customers: filter by risk
   and status, open a case with its documents, record a decision with a reason.
 - **`apps/dsar-console`** — tool #3. A data-subject-request queue: filter by status, type
-  and SLA breach, open a request, resolve it with a note. Built after the fact to show
-  what a new tool costs; `docs/ADDING-A-TOOL.md` is the procedure it followed.
+  and SLA breach, open a request, resolve it with a note.
 - **`apps/complaints-desk`** — tool #4. A complaints queue with an eight-week final-response
   clock: support logs a complaint, data stewards and compliance admins close it with an
-  outcome. Built from the request in `docs/RESULTS.md` and recorded in
-  `docs/demo-new-tool.mp4`.
+  outcome.
 
-Tools #2, #3 and #4 are ~80, ~90 and ~110 lines of routes and contain no authentication,
-no role logic, no masking, no audit plumbing and no infrastructure. See `docs/RESULTS.md`.
 
 ## Run it locally
 
@@ -95,120 +198,6 @@ a regional user gets a 404 rather than a redaction for out-of-region rows, that 
 log rejects `UPDATE` and `DELETE` at the database level, and that every denial is recorded.
 A second CI job fails the build if a tool imports `pg` or touches a session cookie directly.
 
-## Create a new tool
-
-This is the part that replaces Power Apps' authoring experience. The requester describes
-the tool in business terms; Devin does the six steps below; CI refuses anything that
-leaves the paved road. `apps/dsar-console` and `apps/complaints-desk` are the worked
-examples — both were built this way after the platform existed, and `docs/RESULTS.md`
-records what they cost. `docs/NEW-TOOL-PROMPT.md` is the fill-in-the-blanks prompt that
-turns the six steps below into the brief you hand to Devin.
-
-### 0. Write the request, not the design
-
-A usable request states the entity, who may see it, who may change it, and what must be
-recorded. Everything else is the platform's problem:
-
-> A queue of GDPR data-subject requests against existing customers. Support can see the
-> queue but not close anything; data stewards and compliance admins can resolve a request
-> with a note. Region scoping and PII masking as everywhere else. 30-day SLA, flag the
-> breaches, and every read and resolution must be in the audit log.
-
-Note what is absent: no login, no roles table, no masking rules, no audit plumbing, no
-deployment. Asking for those is a sign the request is being over-specified.
-
-### 1. Data — one migration, one access module
-
-```
-db/migrations/00X_<entity>.sql      # the table
-packages/data/src/<entity>.ts       # queries + its FieldPolicy
-```
-
-The access module declares which columns are PII and applies the region scope; tools call
-it and never write SQL, so masking and row-level scope cannot be forgotten in a template.
-
-```ts
-const DSAR_FIELD_POLICY = { full_name: "pii", email: "pii" } as const;
-// every read returns applyFieldPolicy(row, DSAR_FIELD_POLICY, principal)
-```
-
-### 2. Permissions — a data change in one file
-
-Add the permission and give it to roles in `packages/platform/src/rbac.ts`:
-
-```ts
-type Permission = ... | "dsar:read" | "dsar:resolve";
-
-support:            [... "dsar:read"]                 // may watch the queue, not close it
-"data-steward":     [... "dsar:read", "dsar:resolve"]
-"kyc-reviewer":     [...]                             // omitted → refused, silently and by default
-```
-
-A role that is not listed is refused. New tools are deny-by-default without the tool
-containing any authorization logic.
-
-### 3. API — routes and nothing else
-
-```
-apps/<tool>/api/src/server.ts   # loadConfig + createService + buildApp + listen (~20 lines, copy it)
-apps/<tool>/api/src/app.ts      # routes only
-```
-
-Each route names the permission it needs and records what it did:
-
-```ts
-app.post("/api/requests/:id/resolution", requirePermission("dsar:resolve"), async (req, res, next) => {
-  const { resolution, note } = resolutionBody.parse(req.body);   // your domain rules
-  const row = await resolveRequest(db, req.principal!, id, resolution, note);
-  await req.audit({ action: "dsar.request.resolve", resourceType: "dsar_request", resourceId: id });
-  res.json(row);
-});
-```
-
-If you catch yourself writing `jwtVerify`, importing `pg`, or reading a cookie: stop. The
-`policy` CI job fails the build, and the thing you need belongs in `packages/platform` so
-every tool gets it.
-
-### 4. Web — composition, not components
-
-```
-apps/<tool>/web/app/layout.tsx providers.tsx page.tsx
-```
-
-Build screens from `AppShell`, `DataTable`, `FilterBar`, `Card`, `DetailList`, `Pill`,
-`Button` and the inputs. `IfPermitted` hides actions the user cannot take — remember that
-hiding is cosmetic and the API is what actually refuses. Needing a new primitive is fine;
-put it in `packages/ui` so tool #12 inherits it.
-
-### 5. Register and ship
-
-```hcl
-# infra/variables.tf
-<tool> = { api_port = 400X, web_port = 300X }
-```
-
-plus an OIDC client in `services/idp`, two `dev:` scripts in `package.json`, and a test
-file asserting who is refused — the 403s and the out-of-region 404, not just the happy
-path. Then `npm run lint && npm run typecheck && npm test`, and open a PR.
-
-Last and most important: give the tool a **named owner** in the catalogue. A tool without
-one is the failure mode this platform exists to prevent.
-
-## Infrastructure
-
-`infra/` is Terraform, Docker-backed so it runs anywhere. A tool is a map entry:
-
-```hcl
-tools = {
-  customer-console = { api_port = 4001, web_port = 3001 }
-  kyc-queue        = { api_port = 4002, web_port = 3002 }
-  dsar-console     = { api_port = 4003, web_port = 3003 }
-  complaints-desk  = { api_port = 4004, web_port = 3004 }
-}
-```
-
-The provider blocks are the only thing that changes when this targets a real cloud; the
-module interface (API container, web container, shared database, shared IdP) does not.
 
 ## Deliberately not here
 
