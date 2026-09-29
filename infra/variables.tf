@@ -54,5 +54,9 @@ variable "tools" {
       api_port = 4004
       web_port = 3004
     }
+    account-unlock = {
+      api_port = 4005
+      web_port = 3005
+    }
   }
 }

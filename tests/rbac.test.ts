@@ -33,6 +33,15 @@ describe("group-to-role mapping", () => {
     expect(can(reviewer, "complaint:read")).toBe(false);
   });
 
+  it("lets support view locked accounts but reserves unlocking for compliance-admin", () => {
+    const support = principalFromClaims({ sub: "u1", groups: ["internal-support"] });
+    const steward = principalFromClaims({ sub: "u2", groups: ["data-stewards"] });
+    const admin = principalFromClaims({ sub: "u3", groups: ["compliance-admins"] });
+    expect([can(support, "account_lock:read"), can(support, "account_lock:unlock")]).toEqual([true, false]);
+    expect([can(steward, "account_lock:read"), can(steward, "account_lock:unlock")]).toEqual([false, false]);
+    expect([can(admin, "account_lock:read"), can(admin, "account_lock:unlock")]).toEqual([true, true]);
+  });
+
   it("only compliance-admin can read the audit log", () => {
     const admin = principalFromClaims({ sub: "u1", groups: ["compliance-admins"] });
     const steward = principalFromClaims({ sub: "u2", groups: ["data-stewards"] });
