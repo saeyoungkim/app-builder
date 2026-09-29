@@ -11,6 +11,16 @@ import { generateKeyPair, exportJWK } from "jose";
 import Provider, { type Configuration } from "oidc-provider";
 import { findUser, USERS } from "./users.ts";
 
+try {
+  process.loadEnvFile("../../.env");
+} catch {
+  try {
+    process.loadEnvFile();
+  } catch {
+    // ignore
+  }
+}
+
 const port = Number(process.env.IDP_PORT ?? 9000);
 const issuer = process.env.IDP_ISSUER ?? `http://localhost:${port}`;
 

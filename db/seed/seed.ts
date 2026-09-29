@@ -4,8 +4,13 @@
  */
 import pg from "pg";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required");
+try {
+  process.loadEnvFile();
+} catch {
+  // .env may not exist in CI or when provided via env vars
+}
+
+const connectionString = process.env.DATABASE_URL ?? "postgres://devuser:devpass@localhost:5432/paved";
 const pool = new pg.Pool({ connectionString });
 
 const FIRST = ["Amara", "Ben", "Chiara", "Divya", "Eitan", "Fumiko", "Grace", "Hassan", "Ingrid", "Jonas", "Keiko", "Liam", "Mira", "Noor", "Otto", "Priya", "Quentin", "Rosa", "Sven", "Tariq"];

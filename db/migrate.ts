@@ -7,11 +7,13 @@ import pg from "pg";
 const here = dirname(fileURLToPath(import.meta.url));
 const dir = join(here, "migrations");
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required");
+try {
+  process.loadEnvFile();
+} catch {
+  // .env may not exist in CI or when provided via env vars
 }
 
+const connectionString = process.env.DATABASE_URL ?? "postgres://devuser:devpass@localhost:5432/paved";
 const pool = new pg.Pool({ connectionString });
 
 await pool.query(`create extension if not exists pgcrypto`);
